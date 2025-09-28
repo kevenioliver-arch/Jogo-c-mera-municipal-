@@ -1,0 +1,657 @@
+import React, { useState, useMemo, useCallback } from 'react';
+// Certifique-se de que esses caminhos de importação estão corretos em seu ambiente
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
+import { Button } from "./components/ui/button";
+import { Progress } from "./components/ui/progress";
+
+// Definição dos tipos para maior clareza e segurança (TypeScript)
+interface Question {
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  explanation: string;
+}
+
+interface QuestionsBySubject {
+  [key: string]: Question[];
+}
+
+// O banco de perguntas fornecido pelo usuário
+const questionsBySubject: QuestionsBySubject = {
+    logica: [
+        {
+            question: "Se todos os gatos são animais e alguns animais são pretos, podemos afirmar que:",
+            options: [
+                "Todos os gatos são pretos",
+                "Alguns gatos podem ser pretos",
+                "Nenhum gato é preto",
+                "Todos os animais são gatos"
+            ],
+            correctAnswer: "Alguns gatos podem ser pretos",
+            explanation: "A conclusão válida é que alguns gatos podem ser pretos, pois a propriedade 'preto' aplica-se a alguns animais, e gatos são animais."
+        },
+        {
+            question: "Qual número completa a sequência: 2, 4, 8, 16, ___?",
+            options: ["18", "20", "32", "24"],
+            correctAnswer: "32",
+            explanation: "A sequência segue o padrão de multiplicação por 2: 2×2=4, 4×2=8, 8×2=16, 16×2=32."
+        },
+        {
+            question: "Se hoje é segunda-feira, que dia será daqui a 9 dias?",
+            options: ["Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira"],
+            correctAnswer: "Quarta-feira",
+            explanation: "9 dias depois de segunda-feira é quarta-feira (segunda + 7 dias = segunda + 2 dias = quarta)."
+        },
+        {
+            question: "Qual figura completa a sequência: círculo, quadrado, triângulo, círculo, quadrado, ___?",
+            options: ["Triângulo", "Círculo", "Quadrado", "Retângulo"],
+            correctAnswer: "Triângulo",
+            explanation: "A sequência se repete: círculo, quadrado, triângulo."
+        },
+        {
+            question: "Se A é maior que B, e B é maior que C, então:",
+            options: ["A é menor que C", "A é maior que C", "B é menor que A", "C é maior que B"],
+            correctAnswer: "A é maior que C",
+            explanation: "Se A > B e B > C, então A > C."
+        },
+        {
+            question: "Qual é o próximo número na sequência: 1, 1, 2, 3, 5, 8, ___?",
+            options: ["10", "11", "12", "13"],
+            correctAnswer: "13",
+            explanation: "Sequência de Fibonacci: soma dos dois números anteriores."
+        },
+        {
+            question: "Se um trem viaja a 60 km/h, quanto tempo leva para percorrer 180 km?",
+            options: ["2 horas", "3 horas", "4 horas", "5 horas"],
+            correctAnswer: "3 horas",
+            explanation: "Tempo = distância / velocidade = 180 / 60 = 3 horas."
+        },
+        {
+            question: "Qual é o valor lógico da proposição: 'Se chove, então a rua está molhada', sabendo que está chovendo?",
+            options: ["Verdadeiro", "Falso", "Indeterminado", "Nenhuma das anteriores"],
+            correctAnswer: "Verdadeiro",
+            explanation: "Se a condição é verdadeira e a consequência também, a proposição é verdadeira."
+        },
+        {
+            question: "Qual é o próximo número na sequência: 5, 10, 20, 40, ___?",
+            options: ["50", "60", "80", "100"],
+            correctAnswer: "80",
+            explanation: "Cada número é o dobro do anterior."
+        },
+        {
+            question: "Se hoje é quinta-feira, que dia será daqui a 15 dias?",
+            options: ["Sábado", "Domingo", "Segunda-feira", "Terça-feira"],
+            correctAnswer: "Sábado",
+            explanation: "15 dias depois de quinta-feira é sábado (15 % 7 = 1, quinta + 1 dia = sexta, mas considerando o ciclo, é sábado)."
+        }
+    ],
+    portugues: [
+        {
+            question: "Qual a forma correta da frase?",
+            options: [
+                "Eu vou no mercado.",
+                "Eu vou ao mercado.",
+                "Eu vou na mercado.",
+                "Eu vou para mercado."
+            ],
+            correctAnswer: "Eu vou ao mercado.",
+            explanation: "A preposição 'a' contrai-se com o artigo 'o' formando 'ao', que é a forma correta para indicar destino."
+        },
+        {
+            question: "Qual a função do sujeito na frase: 'O menino correu rápido'?",
+            options: [
+                "Indicar a ação",
+                "Indicar quem pratica a ação",
+                "Indicar o local",
+                "Indicar o tempo"
+            ],
+            correctAnswer: "Indicar quem pratica a ação",
+            explanation: "O sujeito é quem pratica a ação do verbo."
+        },
+        {
+            question: "Qual a forma correta do plural de 'cidadão'?",
+            options: ["Cidadãos", "Cidadães", "Cidadãos", "Cidadães"],
+            correctAnswer: "Cidadãos",
+            explanation: "O plural de 'cidadão' é 'cidadãos'."
+        },
+        {
+            question: "Qual a classe gramatical da palavra 'rápido' na frase 'Ele corre rápido'?",
+            options: ["Substantivo", "Adjetivo", "Advérbio", "Verbo"],
+            correctAnswer: "Advérbio",
+            explanation: "'Rápido' modifica o verbo 'corre', funcionando como advérbio."
+        },
+        {
+            question: "Qual a forma correta: 'Mau' ou 'Mal'?",
+            options: [
+                "'Mau' é o oposto de bom; 'Mal' é o oposto de bem",
+                "'Mau' é o oposto de bem; 'Mal' é o oposto de bom",
+                "Ambos significam a mesma coisa",
+                "Nenhuma das anteriores"
+            ],
+            correctAnswer: "'Mau' é o oposto de bom; 'Mal' é o oposto de bem",
+            explanation: "'Mau' é adjetivo, 'Mal' é advérbio."
+        },
+        {
+            question: "Qual a forma correta da frase?",
+            options: [
+                "Ela viu o filme ontem.",
+                "Ela viu o filme ontem.",
+                "Ela viu o filme ontem.",
+                "Ela viu o filme ontem."
+            ],
+            correctAnswer: "Ela viu o filme ontem.",
+            explanation: "Frase correta com verbo no passado."
+        },
+        {
+            question: "Qual a forma correta do verbo no presente do indicativo: 'Nós ___ ao parque'?",
+            options: ["vamos", "vão", "vai", "vou"],
+            correctAnswer: "vamos",
+            explanation: "'Nós' exige a forma 'vamos'."
+        },
+        {
+            question: "Qual a forma correta: 'A gente' ou 'A gente é'?",
+            options: ["A gente é", "A gente são", "A gente está", "A gente estão"],
+            correctAnswer: "A gente é",
+            explanation: "'A gente' é singular e exige verbo no singular."
+        },
+        {
+            question: "Qual a forma correta: 'Houveram problemas' ou 'Houve problemas'?",
+            options: ["Houve problemas", "Houveram problemas", "Houve problema", "Houveram problema"],
+            correctAnswer: "Houve problemas",
+            explanation: "'Houve' é verbo impessoal e não varia no plural."
+        },
+        {
+            question: "Qual a forma correta: 'Mais' ou 'Mas'?",
+            options: [
+                "'Mais' indica adição; 'Mas' indica contraste",
+                "'Mais' indica contraste; 'Mas' indica adição",
+                "Ambos significam a mesma coisa",
+                "Nenhuma das anteriores"
+            ],
+            correctAnswer: "'Mais' indica adição; 'Mas' indica contraste",
+            explanation: "'Mais' é advérbio de intensidade; 'Mas' é conjunção adversativa."
+        }
+    ],
+    informatica: [
+        {
+            question: "O que significa a sigla 'CPU'?",
+            options: [
+                "Central Processing Unit",
+                "Computer Personal Unit",
+                "Central Program Unit",
+                "Computer Processing Unit"
+            ],
+            correctAnswer: "Central Processing Unit",
+            explanation: "CPU significa Central Processing Unit, ou Unidade Central de Processamento em português."
+        },
+        {
+            question: "Qual programa é usado para editar textos?",
+            options: [
+                "Navegador",
+                "Editor de texto",
+                "Planilha eletrônica",
+                "Antivírus"
+            ],
+            correctAnswer: "Editor de texto",
+            explanation: "Editor de texto é usado para criar e editar documentos de texto."
+        },
+        {
+            question: "O que é um sistema operacional?",
+            options: [
+                "Um programa para editar imagens",
+                "Um software que gerencia hardware e recursos do computador",
+                "Um tipo de vírus",
+                "Um navegador de internet"
+            ],
+            correctAnswer: "Um software que gerencia hardware e recursos do computador",
+            explanation: "Sistema operacional é o software principal que controla o computador."
+        },
+        {
+            question: "Qual dispositivo é usado para entrada de dados?",
+            options: [
+                "Monitor",
+                "Teclado",
+                "Impressora",
+                "Alto-falante"
+            ],
+            correctAnswer: "Teclado",
+            explanation: "Teclado é um dispositivo de entrada para digitar dados."
+        },
+        {
+            question: "O que é um navegador de internet?",
+            options: [
+                "Um programa para acessar páginas web",
+                "Um programa para editar vídeos",
+                "Um tipo de hardware",
+                "Um sistema operacional"
+            ],
+            correctAnswer: "Um programa para acessar páginas web",
+            explanation: "Navegador permite acessar e visualizar sites na internet."
+        }
+    ],
+    rondonia: [
+        {
+            question: "Qual é a capital do estado de Rondônia?",
+            options: ["Porto Velho", "Ji-Paraná", "Ariquemes", "Vilhena"],
+            correctAnswer: "Porto Velho",
+            explanation: "Porto Velho é a capital e maior cidade do estado de Rondônia."
+        },
+        {
+            question: "Rondônia faz fronteira com qual país?",
+            options: ["Argentina", "Bolívia", "Peru", "Paraguai"],
+            correctAnswer: "Bolívia",
+            explanation: "Rondônia faz fronteira com a Bolívia ao sul."
+        },
+        {
+            question: "Qual é o principal bioma de Rondônia?",
+            options: ["Caatinga", "Mata Atlântica", "Amazônia", "Pampa"],
+            correctAnswer: "Amazônia",
+            explanation: "Rondônia está localizado na região da Amazônia."
+        },
+        {
+            question: "Qual rio é importante para Rondônia?",
+            options: ["Rio São Francisco", "Rio Madeira", "Rio Paraná", "Rio Tietê"],
+            correctAnswer: "Rio Madeira",
+            explanation: "O Rio Madeira é um dos principais rios que cortam Rondônia."
+        },
+        {
+            question: "Em que ano Rondônia foi elevado à categoria de estado?",
+            options: ["1981", "1979", "1985", "1990"],
+            correctAnswer: "1981",
+            explanation: "Rondônia tornou-se estado da federação em 1981."
+        }
+    ],
+    legislacao: [
+        {
+            question: "Qual é a função principal da Constituição Federal?",
+            options: [
+                "Criar leis municipais",
+                "Estabelecer os direitos e deveres dos cidadãos",
+                "Organizar festas públicas",
+                "Definir o calendário escolar"
+            ],
+            correctAnswer: "Estabelecer os direitos e deveres dos cidadãos",
+            explanation: "A Constituição Federal é a lei fundamental que estabelece a organização do Estado e os direitos e deveres dos cidadãos."
+        },
+        {
+            question: "O que é um decreto?",
+            options: [
+                "Uma lei aprovada pelo Congresso",
+                "Uma norma emitida pelo Poder Executivo",
+                "Uma decisão judicial",
+                "Um projeto de lei"
+            ],
+            correctAnswer: "Uma norma emitida pelo Poder Executivo",
+            explanation: "Decreto é uma norma jurídica expedida pelo Poder Executivo."
+        },
+        {
+            question: "Qual o órgão responsável por criar leis federais no Brasil?",
+            options: [
+                "Poder Executivo",
+                "Poder Judiciário",
+                "Congresso Nacional",
+                "Tribunal de Contas"
+            ],
+            correctAnswer: "Congresso Nacional",
+            explanation: "O Congresso Nacional é responsável pela elaboração das leis federais."
+        },
+        {
+            question: "O que é um direito fundamental?",
+            options: [
+                "Direito que pode ser retirado a qualquer momento",
+                "Direito básico garantido a todos os cidadãos",
+                "Direito exclusivo do governo",
+                "Direito que não está na Constituição"
+            ],
+            correctAnswer: "Direito básico garantido a todos os cidadãos",
+            explanation: "Direitos fundamentais são garantias básicas previstas na Constituição."
+        },
+        {
+            question: "Qual é a função do Poder Judiciário?",
+            options: [
+                "Criar leis",
+                "Executar leis",
+                "Interpretar e aplicar as leis",
+                "Fiscalizar contas públicas"
+            ],
+            correctAnswer: "Interpretar e aplicar as leis",
+            explanation: "O Judiciário interpreta e aplica as leis nos casos concretos."
+        }
+    ],
+    administrativo: [
+        {
+            question: "O que é planejamento estratégico?",
+            options: [
+                "Definir metas e objetivos para o futuro da organização",
+                "Controlar as finanças da empresa",
+                "Contratar funcionários",
+                "Organizar eventos"
+            ],
+            correctAnswer: "Definir metas e objetivos para o futuro da organização",
+            explanation: "Planejamento estratégico é o processo de definir a direção de uma organização através da alocação de recursos e definição de metas."
+        },
+        {
+            question: "Qual a função do setor de recursos humanos?",
+            options: [
+                "Gerenciar o estoque",
+                "Cuidar da contratação e desenvolvimento dos colaboradores",
+                "Realizar vendas",
+                "Controlar a produção"
+            ],
+            correctAnswer: "Cuidar da contratação e desenvolvimento dos colaboradores",
+            explanation: "Recursos humanos gerencia pessoas e processos relacionados."
+        },
+        {
+            question: "O que é organograma?",
+            options: [
+                "Documento financeiro",
+                "Representação gráfica da estrutura organizacional",
+                "Plano de marketing",
+                "Relatório de vendas"
+            ],
+            correctAnswer: "Representação gráfica da estrutura organizacional",
+            explanation: "Organograma mostra a hierarquia e relações na empresa."
+        },
+        {
+            question: "Qual a principal função da contabilidade?",
+            options: [
+                "Gerenciar pessoas",
+                "Registrar e controlar as finanças",
+                "Planejar eventos",
+                "Fazer vendas"
+            ],
+            correctAnswer: "Registrar e controlar as finanças",
+            explanation: "Contabilidade cuida das finanças e registros econômicos."
+        },
+        {
+            question: "O que é liderança?",
+            options: [
+                "Capacidade de influenciar e motivar pessoas",
+                "Controle financeiro",
+                "Organização de documentos",
+                "Venda de produtos"
+            ],
+            correctAnswer: "Capacidade de influenciar e motivar pessoas",
+            explanation: "Liderança é a habilidade de guiar equipes."
+        },
+        // Questões adicionais para completar 10
+        {
+            question: "Qual a importância da comunicação interna na empresa?",
+            options: [
+                "Melhorar o relacionamento e eficiência",
+                "Aumentar vendas externas",
+                "Reduzir custos de produção",
+                "Controlar estoque"
+            ],
+            correctAnswer: "Melhorar o relacionamento e eficiência",
+            explanation: "Comunicação interna eficaz melhora o ambiente e resultados."
+        },
+        {
+            question: "O que é benchmarking?",
+            options: [
+                "Análise da concorrência para melhorar processos",
+                "Planejamento financeiro",
+                "Treinamento de funcionários",
+                "Controle de qualidade"
+            ],
+            correctAnswer: "Análise da concorrência para melhorar processos",
+            explanation: "Benchmarking é comparar práticas para aprimorar a empresa."
+        },
+        {
+            question: "Qual a função do setor de compras?",
+            options: [
+                "Vender produtos",
+                "Adquirir materiais e serviços necessários",
+                "Gerenciar pessoas",
+                "Controlar finanças"
+            ],
+            correctAnswer: "Adquirir materiais e serviços necessários",
+            explanation: "Compras garantem insumos para a operação."
+        },
+        {
+            question: "O que é missão de uma empresa?",
+            options: [
+                "Objetivo financeiro",
+                "Razão de existir e propósito da empresa",
+                "Plano de marketing",
+                "Estrutura organizacional"
+            ],
+            correctAnswer: "Razão de existir e propósito da empresa",
+            explanation: "Missão define o propósito e valores da empresa."
+        },
+        {
+            question: "Qual a importância do controle de qualidade?",
+            options: [
+                "Garantir produtos e serviços dentro dos padrões",
+                "Aumentar o número de funcionários",
+                "Definir a cor do logotipo",
+                "Contratar novos fornecedores"
+            ],
+            correctAnswer: "Garantir produtos e serviços dentro dos padrões",
+            explanation: "Controle de qualidade visa a excelência e conformidade do que é entregue."
+        }
+    ],
+};
+
+// Mapeamento para nomes de exibição mais amigáveis
+const subjectDisplayNames: { [key: string]: string } = {
+  logica: "Raciocínio Lógico",
+  portugues: "Língua Portuguesa",
+  informatica: "Informática Básica",
+  rondonia: "História e Geografia de Rondônia",
+  legislacao: "Noções de Legislação",
+  administrativo: "Noções de Administração",
+};
+
+const QuizGame = () => {
+  // Estados que você já definiu
+  const [currentSubject, setCurrentSubject] = useState<string>('');
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
+  const [score, setScore] = useState<number>(0);
+  const [gameStatus, setGameStatus] = useState<'menu' | 'playing' | 'finished'>('menu');
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [showExplanation, setShowExplanation] = useState<boolean>(false);
+
+  // Memoização para evitar recálculos desnecessários
+  const questions = useMemo(() => currentSubject ? questionsBySubject[currentSubject] : [], [currentSubject]);
+  const totalQuestions = questions.length;
+  const currentQuestion = questions[currentQuestionIndex];
+  const progressValue = totalQuestions > 0 ? ((currentQuestionIndex) / totalQuestions) * 100 : 0;
+
+  // Lógica de manipulação de ações
+  const startGame = useCallback((subject: string) => {
+    setCurrentSubject(subject);
+    setCurrentQuestionIndex(0);
+    setScore(0);
+    setSelectedAnswer(null);
+    setShowExplanation(false);
+    setGameStatus('playing');
+  }, []);
+
+  const handleAnswerSelect = (answer: string) => {
+    if (!selectedAnswer) { // Permite selecionar apenas se ainda não houver uma resposta selecionada
+      setSelectedAnswer(answer);
+      const isCorrect = answer === currentQuestion.correctAnswer;
+      if (isCorrect) {
+        setScore(prevScore => prevScore + 1);
+      }
+      setShowExplanation(true);
+    }
+  };
+
+  const nextQuestion = () => {
+    // Se ainda houver perguntas, avança
+    if (currentQuestionIndex < totalQuestions - 1) {
+      setCurrentQuestionIndex(prevIndex => prevIndex + 1);
+      setSelectedAnswer(null);
+      setShowExplanation(false);
+    } else {
+      // Se for a última pergunta, finaliza o jogo
+      setGameStatus('finished');
+    }
+  };
+
+  const restartGame = () => {
+    setGameStatus('menu');
+    setCurrentSubject('');
+    setCurrentQuestionIndex(0);
+    setScore(0);
+    setSelectedAnswer(null);
+    setShowExplanation(false);
+  };
+
+  // --- Renderização de Componentes ---
+
+  // 1. Menu Inicial
+  const renderMenu = () => (
+    <Card className="w-full max-w-lg mx-auto">
+      <CardHeader>
+        <CardTitle className="text-2xl font-bold">Quiz de Conhecimentos</CardTitle>
+        <CardDescription>Selecione um assunto para começar o desafio!</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {Object.keys(questionsBySubject).map((subjectKey) => (
+          <Button
+            key={subjectKey}
+            className="w-full justify-start text-left h-auto py-3"
+            onClick={() => startGame(subjectKey)}
+            variant="outline"
+          >
+            {subjectDisplayNames[subjectKey]} ({questionsBySubject[subjectKey].length} questões)
+          </Button>
+        ))}
+      </CardContent>
+    </Card>
+  );
+
+  // 2. Tela de Jogo
+  const renderPlaying = () => {
+    if (!currentQuestion) return null; // Garante que a pergunta existe
+
+    const isAnswered = selectedAnswer !== null;
+
+    const getButtonClass = (option: string) => {
+      if (!isAnswered) {
+        return "bg-gray-100 hover:bg-gray-200"; // Cor normal antes de responder
+      }
+      if (option === currentQuestion.correctAnswer) {
+        return "bg-green-500 hover:bg-green-600 text-white"; // Resposta correta
+      }
+      if (option === selectedAnswer) {
+        return "bg-red-500 hover:bg-red-600 text-white"; // Resposta incorreta selecionada
+      }
+      return "bg-gray-100 opacity-50"; // Opções não selecionadas
+    };
+
+    return (
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardHeader>
+          <div className="flex justify-between items-center mb-3">
+            <CardTitle>{subjectDisplayNames[currentSubject]}</CardTitle>
+            <span className="text-lg font-semibold text-blue-600">
+              {currentQuestionIndex + 1} / {totalQuestions}
+            </span>
+          </div>
+          <Progress value={progressValue} className="h-2" />
+          <CardDescription className="mt-4 text-lg font-medium text-gray-800">
+            {currentQuestion.question}
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+          {/* Opções de Resposta */}
+          {currentQuestion.options.map((option, index) => (
+            <Button
+              key={index}
+              className={`w-full h-auto py-3 text-left justify-start whitespace-normal transition-colors duration-300 ${getButtonClass(option)}`}
+              onClick={() => handleAnswerSelect(option)}
+              disabled={isAnswered}
+              variant="outline"
+            >
+              {option}
+            </Button>
+          ))}
+
+          {/* Feedback e Explicação */}
+          {showExplanation && (
+            <div className={`p-4 mt-4 rounded-lg transition-all duration-500 ease-in-out ${selectedAnswer === currentQuestion.correctAnswer ? 'bg-green-100 border-green-400' : 'bg-red-100 border-red-400'} border-l-4`}>
+              <p className="font-bold">
+                {selectedAnswer === currentQuestion.correctAnswer ? "Correto! 🎉" : "Incorreto. ❌"}
+              </p>
+              <p className="text-sm mt-1">
+                **Resposta Correta:** {currentQuestion.correctAnswer}
+              </p>
+              <p className="text-sm mt-2 font-medium italic">
+                {currentQuestion.explanation}
+              </p>
+            </div>
+          )}
+
+          {/* Botão de Próxima Questão */}
+          {isAnswered && (
+            <Button
+              className="w-full mt-6"
+              onClick={nextQuestion}
+            >
+              {currentQuestionIndex < totalQuestions - 1 ? "Próxima Questão" : "Finalizar Quiz"}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // 3. Tela Final
+  const renderFinished = () => {
+    const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
+    let feedbackMessage = "";
+
+    if (percentage === 100) {
+      feedbackMessage = "Parabéns, pontuação máxima! Você é um expert! 🏆";
+    } else if (percentage >= 70) {
+      feedbackMessage = "Excelente resultado! Quase lá! ✨";
+    } else if (percentage >= 50) {
+      feedbackMessage = "Bom trabalho! Continue estudando para melhorar. 👍";
+    } else {
+      feedbackMessage = "Você pode fazer melhor. Revise o material e tente novamente! 📚";
+    }
+
+    return (
+      <Card className="w-full max-w-lg mx-auto text-center">
+        <CardHeader>
+          <CardTitle className="text-3xl font-bold text-blue-700">Quiz Finalizado!</CardTitle>
+          <CardDescription className="text-lg">Resultado em {subjectDisplayNames[currentSubject]}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="text-4xl font-extrabold text-gray-800">
+            {score} / {totalQuestions}
+          </div>
+          <Progress value={percentage} className="h-3" />
+          <p className="text-xl font-semibold text-gray-700">
+            {percentage}% de acerto
+          </p>
+          <p className="text-md italic text-gray-600">
+            {feedbackMessage}
+          </p>
+          <Button
+            className="w-full mt-4"
+            onClick={restartGame}
+          >
+            Voltar ao Menu
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // Renderização principal baseada no estado do jogo
+  return (
+    <div className="flex items-center justify-center min-h-screen p-4 bg-gray-50">
+      {gameStatus === 'menu' && renderMenu()}
+      {gameStatus === 'playing' && renderPlaying()}
+      {gameStatus === 'finished' && renderFinished()}
+    </div>
+  );
+};
+
+export default QuizGame;
